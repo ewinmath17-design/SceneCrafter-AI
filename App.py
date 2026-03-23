@@ -1,13 +1,24 @@
 import streamlit as st
 import json
-# Import library AI pilihanmu (misal: openai, google.generativeai, dll)
-# import google.generativeai as genai
+import google.generativeai as genai
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Cinemind Clone AI", page_icon="🎬", layout="wide")
+st.set_page_config(page_title="SceneCrafter AI", page_icon="🎬", layout="wide")
 
-st.title("🎬 AI Video Scene Builder")
+st.title("🎬 SceneCrafter AI")
 st.markdown("Ubah satu ide menjadi naskah video panjang lengkap dengan prompt visual.")
+
+# --- SETUP API GEMINI DARI STREAMLIT SECRETS ---
+try:
+    # Mengambil API Key dari pengaturan rahasia Streamlit
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=GEMINI_API_KEY)
+    
+    # Menggunakan model Flash yang cepat dan efisien
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except KeyError:
+    st.error("⚠️ API Key belum diatur! Silakan masukkan GEMINI_API_KEY di pengaturan rahasia (Secrets) Streamlit.")
+    st.stop()
 
 # --- SIDEBAR: INPUT PENGGUNA ---
 with st.sidebar:
@@ -36,9 +47,10 @@ def get_system_prompt(ide, niche, durasi, rasio, tone):
     ATURAN:
     1. Hook 15 detik pertama harus memikat.
     2. Pacing: Bagi naskah menjadi scene pendek (15-30 detik).
-    3. Visual Prompt: Tulis prompt gambar dalam bahasa Inggris yang detail.
+    3. Visual Prompt: Tulis prompt gambar dalam bahasa Inggris yang detail sesuai rasio {rasio}.
+    4. Narasi: Gunakan bahasa Indonesia sesuai tone {tone}.
     
-    WAJIB OUTPUT DALAM FORMAT JSON BERIKUT TANPA TEKS LAIN:
+    WAJIB OUTPUT DALAM FORMAT JSON BERIKUT TANPA TEKS LAIN, TANPA MARKDOWN (```json):
     {{
       "project_overview": {{
         "ide_utama": "...",
@@ -60,34 +72,18 @@ def get_system_prompt(ide, niche, durasi, rasio, tone):
 
 # --- LOGIKA GENERATE & TAMPILAN ---
 if generate_btn and ide_user:
-    with st.spinner("Menganalisis ide dan merangkai adegan..."):
+    with st.spinner("Menganalisis ide dan merangkai adegan dengan Gemini..."):
         try:
             prompt = get_system_prompt(ide_user, niche, durasi, rasio, tone)
             
-            # TODO: Masukkan fungsi pemanggilan API AI di sini
-            # Contoh dummy response (Hapus bagian ini dan ganti dengan respons AI asli)
-            dummy_response = """
-            {
-              "project_overview": {
-                "ide_utama": "Misteri Kapal Mary Celeste",
-                "alternatif_judul": ["Misteri Terbesar Lautan", "Kru Menghilang Tanpa Jejak", "Mary Celeste: Fakta Tersembunyi"],
-                "thumbnail_image_prompt": "Cinematic shot of an abandoned wooden ship floating on a misty ocean, dark and eerie atmosphere, 4k resolution, highly detailed."
-              },
-              "hook_pembuka": "Bayangkan kamu menemukan kapal utuh di tengah lautan, tapi tidak ada satu pun orang di dalamnya...",
-              "scenes": [
-                {
-                  "scene_number": 1,
-                  "estimated_duration": "15 detik",
-                  "visual_description": "Kamera bergerak perlahan mendekati kapal berhantu di tengah kabut tebal.",
-                  "ai_image_prompt": "Drone shot approaching an old 19th-century sailing ship, heavy fog, dark blue ocean, mysterious lighting, 16:9.",
-                  "narration_script": "Pada 5 Desember 1872, kapal Mary Celeste ditemukan terombang-ambing di Samudra Atlantik."
-                }
-              ]
-            }
-            """
+            # Memanggil API Gemini dan memaksa output berupa JSON
+            response = model.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
             
-            # Parsing JSON (Pastikan API mengembalikan teks JSON bersih)
-            data = json.loads(dummy_response) # Ganti dummy_response dengan hasil dari API
+            # Parsing JSON dari respon Gemini
+            data = json.loads(response.text)
             
             # --- RENDER KE LAYAR STREAMLIT ---
             st.success("🎉 Script berhasil dibuat!")
@@ -100,7 +96,7 @@ if generate_btn and ide_user:
                 for judul in data["project_overview"]["alternatif_judul"]:
                     st.write(f"- {judul}")
             with col2:
-                st.write("**Prompt Thumbnail (Salin ke Midjourney):**")
+                st.write("**Prompt Thumbnail (Salin ke AI Image Generator):**")
                 st.code(data["project_overview"]["thumbnail_image_prompt"], language="markdown")
             
             st.divider()
@@ -120,6 +116,7 @@ if generate_btn and ide_user:
                     st.markdown(f"> **Voice Over:** *\"{scene['narration_script']}\"*")
                     
         except json.JSONDecodeError:
-            st.error("Gagal memproses data dari AI. Pastikan model AI mengembalikan format JSON yang valid.")
+            st.error("Gagal memproses data dari AI. Format JSON tidak valid.")
+            st.write("Respon mentah:", response.text)
         except Exception as e:
-            st.error(f"Terjadi kesalahan: {e}")
+            st.error(f"Terjadi kesalahan pada API Gemini: {e}")
