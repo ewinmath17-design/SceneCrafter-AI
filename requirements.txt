@@ -1,0 +1,4 @@
+streamlit==1.31.0
+# Tambahkan SDK AI yang kamu gunakan, misalnya:
+# openai
+# google-generativeai
