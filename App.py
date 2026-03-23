@@ -15,7 +15,7 @@ try:
     genai.configure(api_key=GEMINI_API_KEY)
     
     # Menggunakan model Flash yang cepat dan efisien
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
 except KeyError:
     st.error("⚠️ API Key belum diatur! Silakan masukkan GEMINI_API_KEY di pengaturan rahasia (Secrets) Streamlit.")
     st.stop()
